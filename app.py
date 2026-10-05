@@ -6,10 +6,10 @@ from datetime import datetime
 # =============================================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
 # =============================================================
-st.set_page_config(page_title="Sales & Operation Planer | Secuenciación de Planta", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="S&OP | Secuenciación de Planta", layout="wide", initial_sidebar_state="expanded")
 
 st.title("🏭 Tablero de Control S&OP: Optimización de Reactores")
-st.markdown("Herramienta de apoyo para la planificación mensual y asignación óptima de capacidad.")
+st.markdown("Herramienta de apoyo para la planificación operativa, asignación óptima de capacidad y control de eficiencia.")
 
 # =============================================================
 # 2. PANEL LATERAL - PARÁMETROS DEL MES Y TURNOS
@@ -42,6 +42,7 @@ def cargar_datos():
 try:
     df_gantt = cargar_datos()
     
+    # Cálculos de fechas dinámicas
     df_gantt['Inicio_dt'] = fecha_base + pd.to_timedelta(df_gantt['Inicio (hs)'], unit='h')
     df_gantt['Fin_dt'] = fecha_base + pd.to_timedelta(df_gantt['Fin (hs)'], unit='h')
     df_gantt['Duracion_hs'] = df_gantt['Fin (hs)'] - df_gantt['Inicio (hs)']
@@ -67,7 +68,6 @@ with col1:
 with col2:
     st.metric(label="Horas Utilizadas (Makespan)", value=f"{makespan_total:.1f} hs")
 with col3:
-    # Color dinámico para la ocupación (Rojo si supera el 90%)
     delta_color = "normal" if ocupacion_pct <= 90 else "inverse"
     st.metric(label="Ocupación de Planta", value=f"{ocupacion_pct:.1f}%", delta="Riesgo de saturación" if ocupacion_pct > 90 else "Capacidad holgada", delta_color=delta_color)
 with col4:
@@ -80,7 +80,7 @@ st.divider()
 # =============================================================
 st.markdown("### Distribución Operativa (Secuencia MILP)")
 
-fig = px.timeline(
+fig_gantt = px.timeline(
     df_gantt, 
     x_start="Inicio_dt", 
     x_end="Fin_dt", 
@@ -97,8 +97,8 @@ fig = px.timeline(
     }
 )
 
-fig.update_yaxes(autorange="reversed")
-fig.update_layout(
+fig_gantt.update_yaxes(autorange="reversed")
+fig_gantt.update_layout(
     showlegend=True, 
     height=400, 
     xaxis_title="Calendario Operativo", 
@@ -106,4 +106,49 @@ fig.update_layout(
     hovermode="closest"
 )
 
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig_gantt, use_container_width=True)
+st.divider()
+
+# =============================================================
+# 6. ANÁLISIS DE EFICIENCIA DIARIA
+# =============================================================
+st.markdown("### Eficiencia de Ocupación Diaria")
+
+# Extraemos solo la fecha (sin la hora) de cada lote
+df_gantt['Fecha_Corte'] = df_gantt['Inicio_dt'].dt.date
+
+# Sumamos cuántas horas trabajó la planta cada día en total
+uso_diario = df_gantt.groupby('Fecha_Corte')['Duracion_hs'].sum().reset_index()
+
+# Calculamos la capacidad máxima diaria (2 tanques * horas del turno)
+capacidad_diaria_maquina = 2 * horas_por_turno
+uso_diario['Eficiencia (%)'] = (uso_diario['Duracion_hs'] / capacidad_diaria_maquina) * 100
+
+# Armamos el gráfico de barras
+fig_eficiencia = px.bar(
+    uso_diario, 
+    x='Fecha_Corte', 
+    y='Eficiencia (%)',
+    text_auto='.1f',
+    labels={'Fecha_Corte': 'Día Operativo', 'Eficiencia (%)': '% de Eficiencia'},
+    color='Eficiencia (%)',
+    color_continuous_scale='RdYlGn'
+)
+
+# Línea roja marcando el 100% de la capacidad física
+fig_eficiencia.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="Capacidad Instalada (100%)")
+fig_eficiencia.update_layout(yaxis_range=[0, max(uso_diario['Eficiencia (%)'].max() + 10, 110)])
+
+st.plotly_chart(fig_eficiencia, use_container_width=True)
+
+# =============================================================
+# 7. TABLA DE DATOS AUDITABLE
+# =============================================================
+st.markdown("### Detalle Operativo de Secuenciación")
+
+tabla_limpia = df_gantt[['Tanque', 'Lote', 'Inicio_dt', 'Fin_dt', 'Duracion_hs']].copy()
+tabla_limpia.rename(columns={'Inicio_dt': 'Fecha/Hora Inicio', 'Fin_dt': 'Fecha/Hora Fin', 'Duracion_hs': 'Duración (hs)'}, inplace=True)
+tabla_limpia['Fecha/Hora Inicio'] = tabla_limpia['Fecha/Hora Inicio'].dt.strftime('%Y-%m-%d %H:%M')
+tabla_limpia['Fecha/Hora Fin'] = tabla_limpia['Fecha/Hora Fin'].dt.strftime('%Y-%m-%d %H:%M')
+
+st.dataframe(tabla_limpia, use_container_width=True)
