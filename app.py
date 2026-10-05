@@ -9,7 +9,7 @@ from datetime import datetime
 st.set_page_config(page_title="S&OP | Secuenciación de Planta", layout="wide", initial_sidebar_state="expanded")
 
 st.title("🏭 Tablero de Control S&OP: Optimización de Reactores")
-st.markdown("Herramienta de apoyo para la planificación operativa, asignación óptima de capacidad y control de eficiencia diaria.")
+st.markdown("Herramienta de apoyo para la planificación operativa y asignación óptima de capacidad.")
 
 # =============================================================
 # 2. PANEL LATERAL - PARÁMETROS DEL MES Y TURNOS
@@ -42,19 +42,11 @@ try:
     df_gantt['Fin_dt'] = fecha_base + pd.to_timedelta(df_gantt['Fin (hs)'], unit='h')
     df_gantt['Duracion_hs'] = df_gantt['Fin (hs)'] - df_gantt['Inicio (hs)']
     
-    # -------------------------------------------------------------
-    # CÁLCULO DINÁMICO DE CAPACIDAD INSTALADA
-    # -------------------------------------------------------------
-    # 1. Detectamos cuántos equipos distintos están operando en el CSV
+    # Cálculo dinámico de capacidad instalada
     cantidad_equipos = df_gantt['Tanque'].nunique()
-    
-    # 2. Capacidad Diaria = (Cant. Equipos) x (Horas del Turno)
     capacidad_diaria_planta = cantidad_equipos * horas_por_turno
-    
-    # 3. Capacidad Mensual = Capacidad Diaria x Días Laborables
     capacidad_mensual_hs = capacidad_diaria_planta * dias_laborables
     
-    # Horas totales de proceso reales (suma de todos los lotes)
     horas_totales_usadas = df_gantt['Duracion_hs'].sum()
     ocupacion_pct = (horas_totales_usadas / capacidad_mensual_hs) * 100
 
@@ -81,7 +73,7 @@ with col4:
 st.divider()
 
 # =============================================================
-# 5. DIAGRAMA DE GANTT (CON GRILLA DIARIA)
+# 5. DIAGRAMA DE GANTT COMPACTO (PLOTLY)
 # =============================================================
 st.markdown("### Distribución Operativa (Línea de Tiempo Mensual)")
 
@@ -96,15 +88,20 @@ fig_gantt = px.timeline(
 
 fig_gantt.update_yaxes(autorange="reversed")
 
-# Forzamos la cuadrícula de 24 horas (86400000 milisegundos)
+# Recortamos el gráfico exactamente al primer y último lote
+fecha_min = df_gantt['Inicio_dt'].min()
+fecha_max = df_gantt['Fin_dt'].max()
+
 fig_gantt.update_layout(
     showlegend=True, 
-    height=400, 
-    xaxis_title="Calendario Operativo", 
+    height=300, # Altura más compacta
+    margin=dict(l=0, r=0, t=30, b=0), # Eliminamos márgenes muertos
+    xaxis_title="", # Sacamos el título del eje X para ahorrar espacio
     yaxis_title="Equipos",
     xaxis=dict(
+        range=[fecha_min, fecha_max], # Fuerzo a que no haya espacio vacío a los costados
         tickformat="%d/%m\n%H:%M", 
-        dtick=86400000, 
+        dtick=86400000, # Marca de 24 hs
         showgrid=True,
         gridcolor='rgba(200, 200, 200, 0.3)',
         gridwidth=1
@@ -115,51 +112,7 @@ st.plotly_chart(fig_gantt, use_container_width=True)
 st.divider()
 
 # =============================================================
-# 6. ANÁLISIS DE EFICIENCIA DIARIA (MES COMPLETO)
-# =============================================================
-st.markdown("### Eficiencia de Ocupación Diaria")
-
-# 1. Sumamos horas por día
-df_gantt['Fecha_Corte'] = df_gantt['Inicio_dt'].dt.date
-uso_diario = df_gantt.groupby('Fecha_Corte')['Duracion_hs'].sum().reset_index()
-
-# 2. Generamos el calendario completo del mes
-fecha_inicio_plan = df_gantt['Fecha_Corte'].min()
-rango_mes = pd.date_range(start=fecha_inicio_plan, periods=dias_laborables).date
-
-# 3. Alineamos los datos (los días vacíos se rellenan con 0 horas)
-uso_diario = uso_diario.set_index('Fecha_Corte').reindex(rango_mes, fill_value=0).reset_index()
-uso_diario.columns = ['Fecha_Corte', 'Duracion_hs']
-
-# 4. Calculamos eficiencia usando la Capacidad Diaria Dinámica
-uso_diario['Eficiencia (%)'] = (uso_diario['Duracion_hs'] / capacidad_diaria_planta) * 100
-
-# 5. Gráfico de barras
-fig_eficiencia = px.bar(
-    uso_diario, 
-    x='Fecha_Corte', 
-    y='Eficiencia (%)',
-    text_auto='.1f',
-    labels={'Fecha_Corte': 'Día del Mes', 'Eficiencia (%)': '% de Eficiencia'},
-    color='Eficiencia (%)',
-    color_continuous_scale='RdYlGn',
-    range_color=[0, 100]
-)
-
-fig_eficiencia.add_hline(y=100, line_dash="dash", line_color="red", annotation_text=f"Capacidad Máxima ({capacidad_diaria_planta} hs)")
-
-fig_eficiencia.update_layout(
-    yaxis_range=[0, max(uso_diario['Eficiencia (%)'].max() + 10, 110)],
-    xaxis=dict(
-        tickmode='linear', 
-        dtick=86400000 # Fuerza a mostrar todos los días sin saltear etiquetas
-    )
-)
-
-st.plotly_chart(fig_eficiencia, use_container_width=True)
-
-# =============================================================
-# 7. TABLA DE DATOS 
+# 6. TABLA DE DATOS AUDITABLE
 # =============================================================
 st.markdown("### Detalle Operativo de Secuenciación")
 
