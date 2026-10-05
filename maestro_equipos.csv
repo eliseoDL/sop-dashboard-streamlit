@@ -1,0 +1,4 @@
+ID_Tanque,Tipo,Capacidad_L,Tiempo_CIP_hs,Costo_CIP_ARS,Potencia_Agitador_kW
+TK-100,Reactor Batch,10000,2.0,18000,15.0
+TK-200,Reactor Batch,5000,1.5,12000,8.0
+TK-300,Tanque Mezclador,2000,1.0,7000,3.5

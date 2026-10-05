@@ -1,0 +1,9 @@
+SKU_Producto,ID_Insumo,Descripcion_Insumo,Fraccion_Receta,Costo_Unitario_ARS,Unidad_Medida
+LAV-CLA-01,MP-01,Hipoclorito de Sodio 110g/L,0.15,450.0,L
+LAV-CLA-01,MP-02,Agua Tratada,0.85,5.0,L
+LAV-FLO-02,MP-01,Hipoclorito de Sodio 110g/L,0.12,450.0,L
+LAV-FLO-02,MP-02,Agua Tratada,0.87,5.0,L
+LAV-FLO-02,MP-03,Esencia Floral,0.01,8500.0,L
+LAV-BLA-03,MP-01,Hipoclorito de Sodio 110g/L,0.14,450.0,L
+LAV-BLA-03,MP-02,Agua Tratada,0.855,5.0,L
+LAV-BLA-03,MP-04,Blanqueador Óptico,0.005,12000.0,L
