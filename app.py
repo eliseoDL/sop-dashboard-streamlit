@@ -1,53 +1,72 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
 st.set_page_config(page_title="Dashboard S&OP", layout="wide")
 
-st.title("📊 Simulador Táctico S&OP")
-st.markdown("Herramienta de planificación financiera y operativa mensual.")
+st.title("📊 Panel Táctico S&OP (Sales & Operations Planning)")
+st.markdown("Herramienta interactiva para la planificación y conciliación entre Demanda y Capacidad de Planta.")
 
-# --- Cargar Datos ---
-try:
-    df_sop = pd.read_csv('resultados_sop.csv')
-except FileNotFoundError:
-    st.error("No se encontró el archivo resultados_sop.csv. Ejecuta el modelo primero.")
+# --- 1. Cargar Datos ---
+@st.cache_data
+def load_data():
+    try:
+        return pd.read_csv('resultados_sop_mensual.csv')
+    except FileNotFoundError:
+        return pd.DataFrame()
+
+df = load_data()
+
+if df.empty:
+    st.warning("No se encontró el archivo 'resultados_sop_mensual.csv'. Ejecuta el Jupyter Notebook primero para generarlo.")
     st.stop()
 
-# --- Filtros (Sidebar) ---
-st.sidebar.header("Filtros")
-skus_disponibles = df_sop['SKU'].unique().tolist()
-sku_seleccionados = st.sidebar.multiselect("Seleccionar SKU", skus_disponibles, default=skus_disponibles)
+# --- 2. Filtros de Planificación (Sidebar) ---
+st.sidebar.header("Filtros de Planificación")
 
-# Filtrar el dataframe
-df_filtrado = df_sop[df_sop['SKU'].isin(sku_seleccionados)]
+# Filtro de Mes
+meses_disponibles = sorted(df['Mes'].unique().tolist())
+mes_seleccionado = st.sidebar.selectbox("Seleccionar Mes", meses_disponibles)
 
-# --- KPIs (Tarjetas Superiores) ---
-col1, col2, col3 = st.columns(3)
+# Filtrar base por el mes seleccionado
+df_mes = df[df['Mes'] == mes_seleccionado]
 
-demanda_total = df_filtrado['Demanda_Proyectada (L)'].sum()
-produccion_total = df_filtrado['Produccion_Asignada (L)'].sum()
-nivel_servicio_promedio = (produccion_total / demanda_total * 100) if demanda_total > 0 else 0
+# Filtro de SKU
+skus_disponibles = sorted(df_mes['SKU'].unique().tolist())
+skus_seleccionados = st.sidebar.multiselect("Seleccionar SKU", skus_disponibles, default=skus_disponibles)
 
-with col1:
-    st.metric("Demanda Total Proyectada", f"{demanda_total:,.0f} L")
-with col2:
-    st.metric("Producción Total Asignada", f"{produccion_total:,.0f} L")
-with col3:
-    st.metric("Nivel de Servicio Promedio", f"{nivel_servicio_promedio:.1f}%")
+# Aplicar filtro final
+df_filtrado = df_mes[df_mes['SKU'].isin(skus_seleccionados)]
+
+# --- 3. KPIs Estratégicos ---
+# Agrupamos por SKU para no duplicar la Demanda Target (ya que puede estar dividida en varios tanques)
+df_agrupado_sku = df_filtrado.groupby('SKU').agg({
+    'Demanda_Target (L)': 'max',
+    'Volumen_Asignado (L)': 'sum'
+}).reset_index()
+
+demanda_total = df_agrupado_sku['Demanda_Target (L)'].sum()
+produccion_total = df_agrupado_sku['Volumen_Asignado (L)'].sum()
+horas_totales = df_filtrado['Horas_Consumidas'].sum()
+nivel_servicio = (produccion_total / demanda_total * 100) if demanda_total > 0 else 0
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Demanda Total (L)", f"{demanda_total:,.0f}")
+col2.metric("Producción Asignada (L)", f"{produccion_total:,.0f}")
+col3.metric("Horas Máquina (hs)", f"{horas_totales:,.1f}")
+col4.metric("Nivel de Servicio", f"{nivel_servicio:.1f}%")
 
 st.markdown("---")
 
-# --- Gráficos ---
+# --- 4. Gráficos ---
 col_graf1, col_graf2 = st.columns(2)
 
 with col_graf1:
-    st.subheader("Demanda vs. Producción por SKU")
+    st.subheader(f"Cumplimiento por Producto - {mes_seleccionado}")
     fig1 = px.bar(
-        df_filtrado, 
-        x='SKU', 
-        y=['Demanda_Proyectada (L)', 'Produccion_Asignada (L)'], 
+        df_agrupado_sku,
+        x='SKU',
+        y=['Demanda_Target (L)', 'Volumen_Asignado (L)'],
         barmode='group',
         labels={'value': 'Litros', 'variable': 'Métrica'},
         color_discrete_sequence=['#1f77b4', '#2ca02c']
@@ -56,19 +75,18 @@ with col_graf1:
     st.plotly_chart(fig1, use_container_width=True)
 
 with col_graf2:
-    st.subheader("Nivel de Servicio por SKU (%)")
-    # Gráfico de barras horizontales o de medidor (gauge) simplificado
-    fig2 = px.bar(
-        df_filtrado, 
-        y='SKU', 
-        x='Nivel_Servicio (%)', 
-        orientation='h',
-        color='Nivel_Servicio (%)',
-        color_continuous_scale='RdYlGn',
-        range_x=[0, 100]
+    st.subheader(f"Carga Operativa por Tanque - {mes_seleccionado}")
+    # Agrupamos las horas por tanque
+    df_tanques = df_filtrado.groupby('Tanque_Asignado')['Horas_Consumidas'].sum().reset_index()
+    fig2 = px.pie(
+        df_tanques,
+        names='Tanque_Asignado',
+        values='Horas_Consumidas',
+        hole=0.4,
+        color_discrete_sequence=px.colors.qualitative.Pastel
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-# --- Tabla Detallada ---
-st.subheader("Detalle del Plan de Producción")
+# --- 5. Tabla de Master Production Schedule (MPS) ---
+st.subheader("Detalle Táctico de Asignación")
 st.dataframe(df_filtrado, use_container_width=True)
