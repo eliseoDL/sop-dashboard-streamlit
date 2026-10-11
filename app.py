@@ -83,7 +83,7 @@ with col_graf1:
         color_discrete_sequence=['#1f77b4', '#2ca02c']
     )
     fig1.update_layout(legend_title_text='')
-    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(fig1, width='stretch')
 
 with col_graf2:
     st.subheader(f"Carga Operativa por Tanque - {mes_seleccionado}")
@@ -95,8 +95,8 @@ with col_graf2:
         hole=0.4,
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width='stretch')
 
 # --- 5. Tabla de Master Production Schedule (MPS) ---
 st.subheader("Detalle Táctico de Asignación")
-st.dataframe(df_filtrado, use_container_width=True)
+st.dataframe(df_filtrado, width='stretch')
