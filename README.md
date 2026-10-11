@@ -1,35 +1,42 @@
-# 📊 Simulador Táctico S&OP: Optimización MILP para Planificación de la Producción
+# S&OP Tactical Planner - Optimizador de Producción MILP
 
-## 📌 Sobre el Proyecto
-Esta aplicación es una herramienta táctica de apoyo a la toma de decisiones diseñada para tender un puente entre la **Planificación Comercial (Demanda)** y la **Ejecución en Planta (Capacidad)**. 
+Este proyecto nació para resolver un problema clásico en las fábricas: la desconexión entre lo que Comercial quiere vender y lo que Planta realmente puede fabricar. 
 
-En la industria, los sistemas tradicionales calculan requerimientos (MRP) pero suelen fallar al optimizar la capacidad física real frente a escenarios de alta demanda. Este proyecto soluciona ese cuello de botella utilizando un modelo matemático de **Programación Lineal Entera Mixta (MILP)** para evaluar escenarios multi-mes, proyectar la demanda, asegurar el nivel de servicio y asignar de forma óptima el volumen a los reactores disponibles para maximizar la rentabilidad y minimizar los costos operativos.
+Casi todos los sistemas (como los MRP) calculan requerimientos, pero muchas veces ignoran si los equipos tienen las horas físicas para hacerlo. Para solucionar esto, armé un simulador S&OP en Python que proyecta la demanda y usa Programación Lineal (MILP) para decidir qué producto asignar a qué reactor, buscando siempre maximizar la rentabilidad sin pasarnos de la capacidad real.
 
-## 🚀 Características Principales (Business Value)
-1. **Forecasting y Nivel de Servicio:** Proyecta la demanda comercial basándose en históricos de ventas, aplicando factores de estacionalidad (+15%) y políticas de stock de seguridad (+5%).
-2. **Cálculo de Capacidad Real:** Modela las restricciones físicas de la planta descontando paradas por mantenimiento preventivo y tiempos de limpieza (CIP) por equipo.
-3. **Optimización Matemática (PuLP):** El algoritmo decide automáticamente cuántos litros de cada SKU asignar a cada tanque específico para cumplir la demanda gastando la menor cantidad de horas máquina posibles.
-4. **Dashboard Gerencial:** Interfaz web interactiva que permite a la gerencia filtrar la planificación mes a mes, evaluar cuellos de botella y visualizar métricas clave (Nivel de Servicio, Horas Máquina, Producción Asignada).
+## ¿Qué hace exactamente?
 
-## 🛠️ Tecnologías Utilizadas
-* **Lenguaje:** Python 3.x
-* **Modelado Matemático / Optimización:** PuLP
-* **Manipulación y Análisis de Datos:** Pandas
-* **Visualización Dinámica:** Plotly Express
-* **Frontend / Dashboarding:** Streamlit, Jupyter Notebooks
+*   **Proyección de demanda (Forecasting):** Agarra el historial de ventas diario y proyecta los próximos meses, sumándole un factor de crecimiento y un % de stock de seguridad.
+*   **Cálculo de capacidad real:** Mira la tabla de equipos y les descuenta las horas de mantenimiento preventivo y los tiempos de limpieza (CIP) para saber con cuántas horas útiles contamos de verdad.
+*   **Motor de optimización (PuLP):** El corazón del proyecto. Si la demanda es altísima y hay cuello de botella, el algoritmo elige la combinación de productos que deje más margen de ganancia. Si estamos bien de capacidad, minimiza las horas máquina para ahorrar costos operativos.
+*   **Dashboard Gerencial:** El resultado no queda en una consola, sino que se exporta y se levanta en una app de Streamlit donde podés filtrar por mes y ver los KPIs rápido (nivel de servicio, horas consumidas, etc.).
 
-## 📂 Estructura del Proyecto
-* `historial_ventas_lavandina.csv`: Histórico comercial diario (Input Demanda).
-* `maestro_equipos.csv`: Capacidades y tiempos de limpieza de reactores (Input Operaciones).
-* `maestro_recetas.csv`: Estructura de costos de insumos por producto (Input Finanzas).
-* `mantenimiento.csv`: Plan de paradas técnicas de equipos.
-* `notebook_sop.ipynb`: Cuaderno interactivo con el paso a paso del modelo S&OP, desde el forecasting hasta el motor de optimización matemática multi-mes.
-* `app_sop_mensual.py`: Código fuente del panel interactivo (Dashboard).
-* `resultados_sop_mensual.csv`: Output generado por el modelo optimizado, utilizado como base de datos para el dashboard.
+## Stack Tecnológico
 
-## ⚙️ Instrucciones para Ejecución Local
+*   **Python:** Lenguaje base.
+*   **PuLP:** Para armar y resolver el modelo matemático de optimización.
+*   **Pandas:** Para toda la limpieza y cruce de datos (Ventas, Recetas, Equipos).
+*   **Streamlit & Plotly Express:** Para armar la interfaz web y los gráficos.
 
-1. **Clonar el repositorio:**
+## Cómo correrlo localmente
+
+1. **Cloná el repo y metete en la carpeta:**
    ```bash
-   git clone [https://github.com/tu-usuario/tu-repo-sop.git](https://github.com/tu-usuario/tu-repo-sop.git)
+   git clone https://github.com/tu-usuario/tu-repo-sop.git
    cd tu-repo-sop
+   ```
+
+2. **Instalá las librerías necesarias:**
+   *(Te recomiendo usar un entorno virtual)*
+   ```bash
+   pip install pandas pulp streamlit plotly
+   ```
+
+3. **Ejecutá el modelo matemático:**
+   Abrí el archivo `notebook_sop.ipynb` en tu Jupyter (o VSCode) y corré todas las celdas. Esto va a procesar los CSV y generar un archivo nuevo llamado `resultados_sop_mensual.csv` con la asignación óptima.
+
+4. **Levantá el dashboard:**
+   En la terminal, corré este comando para abrir la app web:
+   ```bash
+   streamlit run app_sop_mensual.py
+   ```
