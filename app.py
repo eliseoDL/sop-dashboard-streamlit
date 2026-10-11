@@ -7,6 +7,10 @@ st.set_page_config(page_title="Dashboard S&OP", layout="wide")
 st.title("📊 Panel Táctico S&OP (Sales & Operations Planning)")
 st.markdown("Herramienta interactiva para la planificación y conciliación entre Demanda y Capacidad de Planta.")
 
+# Botón útil para limpiar la memoria caché si actualizás el CSV desde Jupyter
+if st.button("🔄 Recargar Datos"):
+    st.cache_data.clear()
+
 # --- 1. Cargar Datos ---
 @st.cache_data
 def load_data():
@@ -38,8 +42,13 @@ skus_seleccionados = st.sidebar.multiselect("Seleccionar SKU", skus_disponibles,
 # Aplicar filtro final
 df_filtrado = df_mes[df_mes['SKU'].isin(skus_seleccionados)]
 
+# VALIDACIÓN UX: Si desmarcan todo, mostramos un aviso y paramos ahí para no romper los gráficos
+if df_filtrado.empty:
+    st.warning("⚠️ Por favor, selecciona al menos un producto (SKU) en el menú lateral para visualizar los datos.")
+    st.stop()
+
 # --- 3. KPIs Estratégicos ---
-# Agrupamos por SKU para no duplicar la Demanda Target (ya que puede estar dividida en varios tanques)
+# Agrupamos por SKU para no duplicar la Demanda Target
 df_agrupado_sku = df_filtrado.groupby('SKU').agg({
     'Demanda_Target (L)': 'max',
     'Volumen_Asignado (L)': 'sum'
@@ -48,6 +57,8 @@ df_agrupado_sku = df_filtrado.groupby('SKU').agg({
 demanda_total = df_agrupado_sku['Demanda_Target (L)'].sum()
 produccion_total = df_agrupado_sku['Volumen_Asignado (L)'].sum()
 horas_totales = df_filtrado['Horas_Consumidas'].sum()
+
+# División segura para evitar errores matemáticos
 nivel_servicio = (produccion_total / demanda_total * 100) if demanda_total > 0 else 0
 
 col1, col2, col3, col4 = st.columns(4)
@@ -76,7 +87,6 @@ with col_graf1:
 
 with col_graf2:
     st.subheader(f"Carga Operativa por Tanque - {mes_seleccionado}")
-    # Agrupamos las horas por tanque
     df_tanques = df_filtrado.groupby('Tanque_Asignado')['Horas_Consumidas'].sum().reset_index()
     fig2 = px.pie(
         df_tanques,
